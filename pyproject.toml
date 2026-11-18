@@ -1,0 +1,32 @@
+[project]
+name = "jobpilot"
+version = "0.4.0"
+description = "Production-oriented multi-agent job platform with durable queue, RAG, memory, evaluation and observability"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.9",
+  "python-dotenv>=1.0",
+  "openai>=1.50",
+  "browser-use>=0.13",
+  "langgraph>=1.0,<2",
+  "langgraph-checkpoint-sqlite>=2.0",
+  "langgraph-checkpoint-postgres>=2.0",
+  "aiosqlite>=0.20",
+  "psycopg[binary,pool]>=3.2",
+  "pgvector>=0.3",
+  "pypdf>=5.0",
+  "python-docx>=1.1",
+  "opentelemetry-api>=1.30",
+  "opentelemetry-sdk>=1.30",
+  "opentelemetry-exporter-otlp-proto-http>=1.30",
+  "opentelemetry-instrumentation-fastapi>=0.51b0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

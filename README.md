@@ -1,204 +1,279 @@
-﻿# AI Resume Job Matcher Agent — Stateful LangGraph Recruiter Assistant
+﻿<div align="center">
 
-An intelligent, stateful AI Recruiter Agent built with **LangGraph**, **OpenRouter (`openrouter/free`)**, **Streamlit**, **ChromaDB**, **SentenceTransformers (`all-MiniLM-L6-v2`)**, and **BM25**.
+# JobPilot
 
-The agent automates resume parsing, hybrid retrieval, deterministic candidate scoring (0–100), candidate comparison, ranking explainability, interview question generation, multi-round candidate screening (100 -> 10 -> 3), and grounded hire/no-hire recommendations.
+**An AI job-search platform with coordinated agents, resume evidence, and human approval.**
+
+![Version](https://img.shields.io/badge/version-0.4.0-2563EB?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?style=flat-square)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+
+[Capabilities](#core-capabilities) · [Architecture](#architecture) · [Quick start](#quick-start) · [API reference](#main-apis) · [Documentation](#documentation)
+
+</div>
 
 ---
 
-## 🌟 System Architecture
+JobPilot is a portfolio-oriented AI job-search platform built with **LangGraph**, **Browser Use**, and **Resume RAG**. It coordinates planning, job discovery, resume analysis, ranking, and approved application execution, backed by persistent memory and an execution runtime with durable task storage.
+
+**New in v0.4.0:** A durable queue and worker model, PostgreSQL application storage, token and cost accounting, failure classification, an offline agent benchmark, OpenTelemetry integration, and CI.
+
+## Core capabilities
+
+| Capability | What it provides |
+| --- | --- |
+| **Multi-agent orchestration** | Planner, Resume, Search, Ranking, Browser, and Evaluation agents coordinated through LangGraph. |
+| **Human approval** | Application tasks remain at `waiting_approval` until explicitly approved. |
+| **Browser automation** | Browser Use powers job discovery, research, and approved application execution. |
+| **Resume RAG** | TXT, Markdown, PDF, and DOCX parsing with section-aware chunks and job-specific evidence retrieval. |
+| **Persistent memory** | User preferences, job lifecycle state, and LangGraph checkpoints with a stable `workflow_thread_id`. |
+| **Durable execution** | Queue-backed tasks with worker leases, delayed retries, and dead-letter state. |
+| **Flexible storage** | PostgreSQL and pgvector support, with SQLite application, vector, and checkpoint storage for local use. |
+| **Usage and observability** | Token accounting, configurable cost estimates, browser execution metrics, and optional OpenTelemetry traces. |
+| **Evaluation and CI** | A deterministic offline benchmark plus compilation, tests, and benchmark execution on Python 3.11 and 3.13. |
+
+## Architecture
 
 ```text
-                                  Streamlit Web Interface (app.py)
-                                                │
-                                                ▼
-                                   Public Invocation API (run_agent)
-                                                │
-                                                ▼
-                                    LangGraph State Machine Engine
-                                           (src/matching_agent.py)
-                                                │
-                 ┌──────────────────────────────┼──────────────────────────────┐
-                 ▼                              ▼                              ▼
-          Intent Classifier               RAG & Job Matcher              Recruiter Tools
-       (src/intent_classifier.py)      (src/resume_rag.py & job_matcher.py)  (src/agent_tools.py)
-                 │                              │                              │
-                 ▼                              ▼                              ▼
-          OpenRouter LLM                ChromaDB Vector Store           Grounded Synthesis &
-        (openrouter/free)              & BM25 Keyword Search           Question Generator
+                         Web UI / API
+                              │
+                           FastAPI
+                              │
+                      Durable task queue
+                              │
+                      Worker claim + lease
+                              │
+                       LangGraph Planner
+                              │
+               ┌──────────┬─────────┬──────────┐
+               ▼          ▼         ▼          ▼
+             Resume     Search    Ranking    Browser
+               └──────────┴─────────┴──────────┘
+                              │
+                          Evaluation
+                              │
+                       Pass / Replan
+                              │
+                        Terminal state
 ```
 
-### System Responsibility Breakdown
+The planner selects an agent sequence for each task. Evaluation determines whether the workflow passes or needs replanning.
 
-* **LangGraph (`src/matching_agent.py`)**: Stateful workflow orchestration, intent-based conditional routing, `AgentState` management, and `MemorySaver` checkpointer persistence across turns.
-* **OpenRouter LLM (`openrouter/free`)**: Intent classification, qualitative evidence analysis, natural-language candidate comparisons, ranking explanations, interview question generation, and grounded hire/no-hire decision rationale.
-* **Deterministic RAG & JobMatcher (`src/resume_rag.py` & `src/job_matcher.py`)**: Local embeddings (`all-MiniLM-L6-v2`), ChromaDB vector search, BM25 keyword search, structured metadata extraction, and 0–100 candidate scoring (50% Vector + 30% BM25 & Skills + 20% Exp Ratio).
-* **Streamlit UI (`app.py`)**: Recruiter presentation layer for chat interaction, candidate cards, comparison tables, interview question cards, multi-round funnel visualization, and state debugging.
+| Persistence layer | PostgreSQL deployment | Local default |
+| --- | --- | --- |
+| Application data | PostgreSQL: jobs, tasks, traces, memory, queue, usage, and benchmarks | SQLite |
+| Resume vectors | pgvector | SQLite with cosine search |
+| Workflow checkpoints | PostgreSQL checkpointer | SQLite checkpointer |
 
----
-
-## 🚀 Key Features
-
-1. **Natural-Language Query Understanding**: Interprets recruiter prompts and extracts job title, mandatory must-have skills, optional nice-to-have skills, and experience criteria.
-2. **Hybrid Retrieval & Scoring**: Combines dense vector similarity (`sentence-transformers/all-MiniLM-L6-v2`) with BM25 keyword matching and experience ratios.
-3. **Stateful Conversation Memory**: Preserves context, past searches, and refined requirements across multi-turn sessions via LangGraph `MemorySaver` checkpointer using a stable `thread_id`.
-4. **Candidate Comparison Tool**: Generates side-by-side comparative matrices over candidate skills, experience, strengths, and trade-offs.
-5. **Ranking Explainability**: Explains why Candidate A ranked higher than Candidate B using factual score deltas and resume evidence.
-6. **Tailored Interview Questions**: Produces role-specific technical and gap-probing interview questions referencing actual resume evidence.
-7. **Iterative Requirement Refinement**: Updates criteria when recruiter provides feedback (*"Make Docker mandatory"*) while preserving previous mandatory skills.
-8. **Multi-Round Candidate Screening Funnel**:
-   - **Round 1 (Initial Screening)**: Narrows ~100 raw resumes down to Top 10 shortlisted matches.
-   - **Round 2 (Deep Analysis)**: Conducts qualitative evidence evaluation across Top 10 matches and selects Top 3 finalists.
-   - **Round 3 (Final Evaluation)**: Audits Top 3 finalists against mandatory must-have skills and issues grounded **HIRE** or **NO-HIRE** recommendations.
-
----
-
-## 📁 Repository Structure
+### Durable execution
 
 ```text
-resume-rag-job-matcher-agent/
-├── app.py                         # Streamlit Web Application Interface
-├── README.md                      # Complete project documentation
-├── requirements.txt               # Pinned dependencies
-├── .env.example                   # Template for OPENROUTER_API_KEY
-├── .gitignore                     # Git ignore rules
-│
-├── src/                           # Core Source Package
-│   ├── agent_state.py             # AgentState TypedDict & CandidateMatch schemas
-│   ├── matching_agent.py          # LangGraph StateGraph, router & run_agent API
-│   ├── intent_classifier.py       # OpenRouter intent classifier & response schemas
-│   ├── agent_nodes.py             # LangGraph search, ranking & tool wrappers
-│   ├── agent_tools.py             # Candidate comparison, ranking explanation & interview tools
-│   ├── screening_nodes.py         # Multi-round screening pipeline nodes (Rounds 1-3)
-│   ├── llm_config.py              # OpenRouter LLM initialization helper
-│   ├── document_processor.py      # PDF, DOCX, TXT document parser & OCR
-│   ├── text_processor.py          # Section-aware chunker & text cleaner
-│   ├── metadata_extractor.py      # Candidate name, skill, experience extractor
-│   ├── embeddings.py              # Local SentenceTransformers wrapper
-│   ├── vector_store.py            # ChromaDB persistent store & query interface
-│   ├── resume_rag.py              # Document ingestion pipeline
-│   └── job_matcher.py             # Hybrid job matching engine
-│
-├── docs/                          # Architecture & Documentation Deliverables
-│   ├── architecture.md            # Detailed system architecture specification
-│   ├── state_machine.mmd          # LangGraph Mermaid state machine diagram
-│   ├── demo_script.md             # 5–6 minute live demonstration walkthrough
-│   └── assignment_checklist.md    # Assignment requirement verification matrix
-│
-├── tests/                         # Test Scenarios & End-to-End Flows
-│   └── conversation_flows.md      # 6 verified end-to-end conversation flows
-│
-├── scratch/                       # Automated Test Suites (Phases 2 - 6)
-│   ├── test_phase2.py             # Intent Classifier & State schema tests (11/11 pass)
-│   ├── test_phase3.py             # RAG & Ranking Integration tests (5/5 pass)
-│   ├── test_phase4.py             # Agent Tools & Explainability tests (5/5 pass)
-│   ├── test_phase5.py             # LangGraph Workflow & Memory tests (8/8 pass)
-│   ├── test_phase6.py             # Multi-Round Screening tests (8/8 pass)
-│   └── test_all_phases.py         # Master test runner (37/37 pass)
-│
-├── data/                          # Dataset
-│   ├── job_descriptions/          # Sample job description specs
-│   └── selected_resumes/          # 50 PDF resumes across technical categories
-│
-└── chroma_db/                     # Persistent ChromaDB vector database
+POST /api/tasks → Persist task → Approval gate, when required → Enqueue
+                                                                 │
+                                                        Worker claim + lease
+                                                                 │
+                                                        LangGraph workflow
+                                                                 │
+                              ┌──────────────────────────────────┼─────────────────────────┐
+                              ▼                                  ▼                         ▼
+                           Success                         Agent failure             Runtime failure
+                              │                                  │                         │
+                             Done                         Evaluate / Replan        Delayed retry / Dead
 ```
 
----
+Application tasks enter the queue only after approval. Agent-level recovery happens within the workflow; runtime failures are handled by worker retries.
 
-## ⚙️ Setup & Installation
+## Quick start
 
-### 1. Prerequisites
+**Requirements:** Python 3.11+ for local execution, or Docker Compose for the container stack. Run commands from the project root.
 
-* Python 3.10+
-* Git
-
-### 2. Clone Repository & Create Virtual Environment
+### 1. Create a virtual environment
 
 ```bash
-git clone https://github.com/Siddhant20104111/resume-rag-job-matcher-agent.git
-cd resume-rag-job-matcher-agent
-
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment (Windows PowerShell)
-.\venv\Scripts\Activate.ps1
-
-# Activate virtual environment (Linux / macOS)
-source venv/bin/activate
+python -m venv .venv
 ```
 
-### 3. Install Dependencies
+**Windows PowerShell**
 
-```bash
-pip install -r requirements.txt
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
-### 4. Configure Environment Variables
-
-Copy `.env.example` to `.env`:
+**macOS / Linux**
 
 ```bash
+source .venv/bin/activate
+```
+
+### 2. Install dependencies and configure the environment
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Copy the configuration template:
+
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+```bash
+# macOS / Linux
 cp .env.example .env
 ```
 
-Open `.env` and insert your OpenRouter API key:
+Edit `.env` for the capabilities you want to use:
 
-```env
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-```
+| Setting | Purpose |
+| --- | --- |
+| `OPENAI_API_KEY` | Enables provider-backed LLM and embedding requests. |
+| `OPENAI_BASE_URL` | Optional endpoint for an OpenAI-compatible provider. |
+| `LLM_MODEL` / `EMBEDDING_MODEL` | Selects the language and embedding models. |
+| `BROWSER_USE_API_KEY` | Enables the Browser Use model; the browser agent can alternatively use `OPENAI_API_KEY`. |
+| `WORKER_ENABLED` | Enables the embedded worker; defaults to `true` for local execution. |
 
----
+Local fallback paths support offline development, including feature-hash embeddings. Live browser tasks require a configured model provider. See [`.env.example`](.env.example) for all storage, worker, pricing, and telemetry settings.
 
-## 🏃 Running the Application
-
-### 1. Index Resumes
-
-Before your first search, process the resumes in `data/selected_resumes/` and build the local ChromaDB index:
-
-```bash
-python -m src.resume_rag
-```
-
-> Running this command again rebuilds the resume collection from the files in that folder.
-
-### 2. Launch Streamlit Web UI
+### 3. Start the application
 
 ```bash
-streamlit run app.py
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Open your browser at `http://localhost:8501`.
+| Local endpoint | Purpose |
+| --- | --- |
+| [localhost:8000](http://localhost:8000) | Web interface |
+| [localhost:8000/docs](http://localhost:8000/docs) | Interactive API documentation |
+| [localhost:8000/api/health](http://localhost:8000/api/health) | Health and configuration status |
 
-### 3. Run Automated Test Suite
+The embedded worker starts with the API when `WORKER_ENABLED=true`.
 
-To run all 37 integration tests across Phases 2 through 6:
+## Docker deployment
+
+With Docker Compose installed and `.env` configured as above:
 
 ```bash
-python scratch/test_all_phases.py
+docker compose up --build
 ```
 
----
+The included stack starts three services:
 
-## 💬 Example Conversational Queries
+| Service | Responsibility |
+| --- | --- |
+| `postgres` | PostgreSQL with pgvector and a persistent database volume. |
+| `jobpilot` | FastAPI web process exposed on port 8000, with the embedded worker disabled. |
+| `worker` | Independent queue worker consuming tasks from the shared database. |
 
-1. **New Search**:
-   > `"Find Python developers with 3+ years experience in FastAPI and PostgreSQL."`
-2. **Side-by-Side Comparison**:
-   > `"Compare the top 3 candidates side by side."`
-3. **Ranking Explanation**:
-   > `"Why did the top candidate rank higher than the second candidate?"`
-4. **Requirement Refinement**:
-   > `"Actually, make Docker mandatory."`
-5. **Tailored Interview Questions**:
-   > `"Generate interview questions for the top candidate."`
-6. **Multi-Round Screening**:
-   > `"Run a full multi-round screening process on the top Python developer candidates."`
+See the [production runtime guide](docs/PRODUCTION.md) for queue semantics, storage configuration, and telemetry setup.
 
----
+## Main APIs
 
-## 🔮 Realistic System Limitations
+### Planning and tasks
 
-1. **LLM Evidence Dependency**: OpenRouter LLM qualitative analysis relies on candidate resume text extracted during document ingestion. Incomplete resume text may result in unlisted skills being marked as unavailable.
-2. **Decision Support**: Final HIRE / NO-HIRE recommendations serve as executive decision support for recruiters and hiring managers, not autonomous hiring decisions.
-3. **OpenRouter Rate Limits**: Free tier model availability (`openrouter/free`) may occasionally experience latency or rate limits. The system automatically falls back to deterministic rule-based analysis if the API is temporarily unreachable.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/plan` | Preview an agent plan. |
+| `POST` | `/api/tasks` | Create a task. |
+| `POST` | `/api/tasks/{task_id}/approve` | Submit an approval decision. |
+| `POST` | `/api/tasks/{task_id}/resume` | Resume a task. |
+| `GET` | `/api/tasks/{task_id}` | Inspect task details. |
+| `GET` | `/api/tasks` | List tasks. |
+
+### Resume retrieval and memory
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/resume/index` | Parse and index a resume. |
+| `POST` | `/api/resume/search` | Retrieve relevant resume evidence. |
+| `GET` | `/api/memory/users/{user_id}` | Retrieve user preferences and job memory. |
+| `PUT` | `/api/memory/users/{user_id}/{key}` | Update a user preference. |
+| `POST` | `/api/memory/jobs` | Record job lifecycle state. |
+
+### Operations and evaluation
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/queue` | Inspect the task queue. |
+| `GET` | `/api/metrics/summary` | View operational metrics. |
+| `GET` | `/api/tasks/{task_id}/usage` | Inspect task usage and estimated costs. |
+| `POST` | `/api/benchmarks/run` | Run the core benchmark. |
+| `GET` | `/api/benchmarks` | Retrieve benchmark history. |
+
+Request schemas and additional endpoints are available in the [interactive API documentation](http://localhost:8000/docs) when the application is running.
+
+## Usage, costs, and observability
+
+Provider-reported LLM and embedding usage is stored in `usage_events`. Browser tasks record duration, steps, actions, and errors. Cost estimates use the prices you configure:
+
+```dotenv
+LLM_INPUT_COST_PER_1M=0
+LLM_OUTPUT_COST_PER_1M=0
+EMBEDDING_COST_PER_1M=0
+```
+
+Set these values for your selected provider and models; zero defaults produce zero estimated token costs. Provider pricing is not hard-coded.
+
+Database-backed metrics are available through `/api/metrics/summary`. Optional OpenTelemetry export is configured through `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+Failure classification covers timeout, network, rate-limit, CAPTCHA, authentication, element, model, validation, safety-block, and unknown errors.
+
+## Tests and offline benchmark
+
+Install the test dependency and run the suite:
+
+```bash
+python -m pip install pytest
+python -m pytest -q
+```
+
+Run the deterministic benchmark:
+
+```bash
+python -m app.evaluation.benchmark
+```
+
+The benchmark checks planner routing for job searches and applications, evaluation quality-gate behavior, and timeout/CAPTCHA failure classification. Results are persisted in `benchmark_runs`.
+
+GitHub Actions runs compilation, tests, and the offline benchmark on **Python 3.11 and 3.13**. See the [benchmark guide](docs/BENCHMARK.md) for coverage details.
+
+## Repository map
+
+```text
+app/
+├── agents/              # Planner, Resume, Search, Ranking, Browser
+├── evaluation/          # Offline agent benchmark
+├── memory/              # User preferences and job lifecycle memory
+├── observability/       # OpenTelemetry integration
+├── rag/                 # Document parsing, chunking, and vector retrieval
+├── runtime/             # Durable queue worker
+├── services/            # LLM, embeddings, usage, and failure classification
+├── static/              # Web interface assets
+├── storage/             # SQLite/PostgreSQL persistence and task queue
+├── workflow/            # LangGraph orchestration and checkpoints
+├── config.py            # Application settings
+├── db.py                # Storage compatibility facade
+└── main.py              # FastAPI entry point
+
+benchmarks/              # Benchmark resources
+docs/                    # Architecture and runtime documentation
+tests/                   # Automated test suite
+.github/workflows/       # Continuous integration
+Dockerfile               # Application container
+docker-compose.yml       # API, worker, and PostgreSQL stack
+.env.example             # Environment configuration template
+```
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Agent coordination, retrieval, memory, and workflow design. |
+| [Production runtime](docs/PRODUCTION.md) | Durable execution, PostgreSQL, accounting, and telemetry. |
+| [Agent benchmark](docs/BENCHMARK.md) | Offline evaluation cases and persisted results. |
+
+### Validation scope
+
+The automated suite targets the SQLite/local path without external services. PostgreSQL/pgvector, live Browser Use, and OTLP export require their corresponding services and credentials and need integration validation before production reliability claims.

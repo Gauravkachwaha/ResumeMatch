@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: jobpilot
+      POSTGRES_USER: jobpilot
+      POSTGRES_PASSWORD: jobpilot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobpilot -d jobpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - jobpilot_pg:/var/lib/postgresql/data
+
+  jobpilot:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment: &jobpilot_env
+      DATABASE_BACKEND: postgres
+      DATABASE_URL: postgresql://jobpilot:jobpilot@postgres:5432/jobpilot
+      POSTGRES_URL: postgresql://jobpilot:jobpilot@postgres:5432/jobpilot
+      VECTOR_BACKEND: postgres
+      CHECKPOINT_BACKEND: postgres
+      WORKER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["python", "-m", "app.runtime.worker_main"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_BACKEND: postgres
+      DATABASE_URL: postgresql://jobpilot:jobpilot@postgres:5432/jobpilot
+      POSTGRES_URL: postgresql://jobpilot:jobpilot@postgres:5432/jobpilot
+      VECTOR_BACKEND: postgres
+      CHECKPOINT_BACKEND: postgres
+      WORKER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  jobpilot_pg:
