@@ -1,0 +1,10 @@
+{
+  "id": "jd_1",
+  "title": "Senior Python Developer",
+  "category": "Python Developer",
+  "required_experience_years": 4,
+  "must_have_skills": ["Python", "Django", "FastAPI", "PostgreSQL", "REST APIs"],
+  "nice_to_have_skills": ["Docker", "Redis", "Celery", "AWS"],
+  "education": "Bachelor's Degree in Computer Science or related field",
+  "description": "We are seeking a Senior Python Developer with 4+ years of hands-on experience building scalable web APIs and backend systems using Python, Django, and FastAPI. The ideal candidate will have strong SQL skills with PostgreSQL, experience designing RESTful APIs, and familiarity with containerization using Docker. Responsibilities include designing database models, optimizing API endpoints, writing unit tests, and collaborating with frontend teams."
+}

@@ -1,0 +1,10 @@
+{
+  "id": "jd_4",
+  "title": "Senior DevOps Engineer",
+  "category": "DevOps Engineer",
+  "required_experience_years": 4,
+  "must_have_skills": ["Docker", "Kubernetes", "AWS", "CI/CD", "Terraform", "Linux"],
+  "nice_to_have_skills": ["Ansible", "Jenkins", "Python", "Prometheus", "Grafana"],
+  "education": "Bachelor's Degree in Computer Science or IT field",
+  "description": "Seeking an experienced DevOps Engineer with 4+ years managing cloud infrastructure on AWS, building automated CI/CD pipelines, and orchestrating container workloads using Docker and Kubernetes. Requirements include hands-on Terraform infrastructure-as-code expertise, strong shell/Linux administration skills, and monitoring enterprise applications with Prometheus and Grafana."
+}

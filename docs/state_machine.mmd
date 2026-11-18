@@ -1,0 +1,27 @@
+graph TD
+    START([START]) --> IC[intent_classifier]
+    IC --> ROUTER{route_by_intent}
+
+    ROUTER -->|new_search / refine_requirements| PARSE[parse_and_refine]
+    ROUTER -->|screen_candidates / final_recommendation| SCREEN_INIT[initial_screening_node]
+    ROUTER -->|compare_candidates| CMP[compare_candidates_node]
+    ROUTER -->|explain_ranking| EXP[explain_ranking_node]
+    ROUTER -->|generate_interview_questions| INT_Q[generate_interview_questions_node]
+    ROUTER -->|general_question| GEN[general_response_node]
+
+    PARSE --> SEARCH[search_resumes]
+    SEARCH --> RANK[rank_candidates]
+    RANK --> REPORT[generate_report]
+    REPORT --> FB[human_feedback_node]
+
+    SCREEN_INIT --> DEEP[deep_analysis_node]
+    DEEP --> FINAL_EVAL[final_evaluation_node]
+    FINAL_EVAL --> SCREEN_REP[screening_report_node]
+    SCREEN_REP --> FB
+
+    CMP --> FB
+    EXP --> FB
+    INT_Q --> FB
+    GEN --> FB
+
+    FB --> END_NODE([END])

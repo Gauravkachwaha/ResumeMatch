@@ -1,0 +1,33 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# Vector Store & Output Cache
+chroma_db/
+outputs/*.json
+notebooks/outputs/
+
+# Large Dataset Raw Archives
+data/resumes/archive/
+
+# IDE & System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

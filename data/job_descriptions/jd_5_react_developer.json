@@ -1,0 +1,10 @@
+{
+  "id": "jd_5",
+  "title": "Frontend React Developer",
+  "category": "React Developer",
+  "required_experience_years": 3,
+  "must_have_skills": ["React", "JavaScript", "TypeScript", "Redux", "HTML5", "CSS3"],
+  "nice_to_have_skills": ["Next.js", "Tailwind CSS", "Jest", "Webpack", "REST APIs"],
+  "education": "Bachelor's Degree in Computer Science, Web Development, or equivalent",
+  "description": "We are seeking a skilled Frontend React Developer with 3+ years of experience crafting interactive, responsive user interfaces. Candidates must possess deep knowledge of React.js, modern JavaScript (ES6+), TypeScript, HTML5/CSS3, and state management using Redux. Knowledge of Next.js, component testing with Jest, and web performance optimization is highly preferred."
+}
