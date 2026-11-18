@@ -1,292 +1,204 @@
-﻿<div align="center">
+﻿# AI Resume Job Matcher Agent — Stateful LangGraph Recruiter Assistant
 
-# AI Resume Job Matcher
+An intelligent, stateful AI Recruiter Agent built with **LangGraph**, **OpenRouter (`openrouter/free`)**, **Streamlit**, **ChromaDB**, **SentenceTransformers (`all-MiniLM-L6-v2`)**, and **BM25**.
 
-### From resumes to evidence-backed shortlists.
-
-A stateful recruiter assistant for searching, comparing, and screening candidates through natural conversation.
-
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![LangGraph](https://img.shields.io/badge/Agent-LangGraph-0F766E?style=flat-square)
-![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
-![ChromaDB](https://img.shields.io/badge/Vector_Store-ChromaDB-7C3AED?style=flat-square)
-![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-334155?style=flat-square)
-
-[Overview](#overview) · [Quick start](#quick-start) · [Architecture](#architecture) · [Usage](#usage) · [Documentation](#documentation)
-
-</div>
+The agent automates resume parsing, hybrid retrieval, deterministic candidate scoring (0–100), candidate comparison, ranking explainability, interview question generation, multi-round candidate screening (100 -> 10 -> 3), and grounded hire/no-hire recommendations.
 
 ---
 
-## Overview
+## 🌟 System Architecture
 
-AI Resume Job Matcher combines retrieval-augmented generation (RAG), hybrid search, and a LangGraph workflow to help recruiters evaluate resumes against job requirements. It pairs reproducible scoring with resume excerpts, conversational follow-ups, and structured screening reports.
+```text
+                                  Streamlit Web Interface (app.py)
+                                                │
+                                                ▼
+                                   Public Invocation API (run_agent)
+                                                │
+                                                ▼
+                                    LangGraph State Machine Engine
+                                           (src/matching_agent.py)
+                                                │
+                 ┌──────────────────────────────┼──────────────────────────────┐
+                 ▼                              ▼                              ▼
+          Intent Classifier               RAG & Job Matcher              Recruiter Tools
+       (src/intent_classifier.py)      (src/resume_rag.py & job_matcher.py)  (src/agent_tools.py)
+                 │                              │                              │
+                 ▼                              ▼                              ▼
+          OpenRouter LLM                ChromaDB Vector Store           Grounded Synthesis &
+        (openrouter/free)              & BM25 Keyword Search           Question Generator
+```
 
-Start with a job description, refine the requirements, compare the shortlist, and generate interview questions within the same conversation.
+### System Responsibility Breakdown
 
-| Capability | What it delivers |
-| --- | --- |
-| **Resume ingestion** | PDF, DOCX, and TXT parsing, section-aware chunks, and candidate metadata extraction. |
-| **Hybrid matching** | Semantic search, BM25 keyword matching, skill overlap, and experience scoring. |
-| **Conversational refinement** | Update role requirements while retaining context within a session. |
-| **Candidate comparison** | Compare skills, experience, strengths, and gaps across shortlisted candidates. |
-| **Ranking explanations** | Review score differences alongside supporting resume evidence. |
-| **Interview preparation** | Generate role-specific questions and probes for candidate gaps. |
-| **Multi-round screening** | Shortlist up to 10 candidates, evaluate up to 3 finalists, and produce hire/no-hire recommendations. |
+* **LangGraph (`src/matching_agent.py`)**: Stateful workflow orchestration, intent-based conditional routing, `AgentState` management, and `MemorySaver` checkpointer persistence across turns.
+* **OpenRouter LLM (`openrouter/free`)**: Intent classification, qualitative evidence analysis, natural-language candidate comparisons, ranking explanations, interview question generation, and grounded hire/no-hire decision rationale.
+* **Deterministic RAG & JobMatcher (`src/resume_rag.py` & `src/job_matcher.py`)**: Local embeddings (`all-MiniLM-L6-v2`), ChromaDB vector search, BM25 keyword search, structured metadata extraction, and 0–100 candidate scoring (50% Vector + 30% BM25 & Skills + 20% Exp Ratio).
+* **Streamlit UI (`app.py`)**: Recruiter presentation layer for chat interaction, candidate cards, comparison tables, interview question cards, multi-round funnel visualization, and state debugging.
 
-## Quick start
+---
 
-### 1. Prepare your environment
+## 🚀 Key Features
 
-Use **Python 3.10+** and run the following commands from the project root. An OpenRouter API key enables the LLM-assisted features. The default embedding model downloads on first use and runs locally afterward.
+1. **Natural-Language Query Understanding**: Interprets recruiter prompts and extracts job title, mandatory must-have skills, optional nice-to-have skills, and experience criteria.
+2. **Hybrid Retrieval & Scoring**: Combines dense vector similarity (`sentence-transformers/all-MiniLM-L6-v2`) with BM25 keyword matching and experience ratios.
+3. **Stateful Conversation Memory**: Preserves context, past searches, and refined requirements across multi-turn sessions via LangGraph `MemorySaver` checkpointer using a stable `thread_id`.
+4. **Candidate Comparison Tool**: Generates side-by-side comparative matrices over candidate skills, experience, strengths, and trade-offs.
+5. **Ranking Explainability**: Explains why Candidate A ranked higher than Candidate B using factual score deltas and resume evidence.
+6. **Tailored Interview Questions**: Produces role-specific technical and gap-probing interview questions referencing actual resume evidence.
+7. **Iterative Requirement Refinement**: Updates criteria when recruiter provides feedback (*"Make Docker mandatory"*) while preserving previous mandatory skills.
+8. **Multi-Round Candidate Screening Funnel**:
+   - **Round 1 (Initial Screening)**: Narrows ~100 raw resumes down to Top 10 shortlisted matches.
+   - **Round 2 (Deep Analysis)**: Conducts qualitative evidence evaluation across Top 10 matches and selects Top 3 finalists.
+   - **Round 3 (Final Evaluation)**: Audits Top 3 finalists against mandatory must-have skills and issues grounded **HIRE** or **NO-HIRE** recommendations.
+
+---
+
+## 📁 Repository Structure
+
+```text
+resume-rag-job-matcher-agent/
+├── app.py                         # Streamlit Web Application Interface
+├── README.md                      # Complete project documentation
+├── requirements.txt               # Pinned dependencies
+├── .env.example                   # Template for OPENROUTER_API_KEY
+├── .gitignore                     # Git ignore rules
+│
+├── src/                           # Core Source Package
+│   ├── agent_state.py             # AgentState TypedDict & CandidateMatch schemas
+│   ├── matching_agent.py          # LangGraph StateGraph, router & run_agent API
+│   ├── intent_classifier.py       # OpenRouter intent classifier & response schemas
+│   ├── agent_nodes.py             # LangGraph search, ranking & tool wrappers
+│   ├── agent_tools.py             # Candidate comparison, ranking explanation & interview tools
+│   ├── screening_nodes.py         # Multi-round screening pipeline nodes (Rounds 1-3)
+│   ├── llm_config.py              # OpenRouter LLM initialization helper
+│   ├── document_processor.py      # PDF, DOCX, TXT document parser & OCR
+│   ├── text_processor.py          # Section-aware chunker & text cleaner
+│   ├── metadata_extractor.py      # Candidate name, skill, experience extractor
+│   ├── embeddings.py              # Local SentenceTransformers wrapper
+│   ├── vector_store.py            # ChromaDB persistent store & query interface
+│   ├── resume_rag.py              # Document ingestion pipeline
+│   └── job_matcher.py             # Hybrid job matching engine
+│
+├── docs/                          # Architecture & Documentation Deliverables
+│   ├── architecture.md            # Detailed system architecture specification
+│   ├── state_machine.mmd          # LangGraph Mermaid state machine diagram
+│   ├── demo_script.md             # 5–6 minute live demonstration walkthrough
+│   └── assignment_checklist.md    # Assignment requirement verification matrix
+│
+├── tests/                         # Test Scenarios & End-to-End Flows
+│   └── conversation_flows.md      # 6 verified end-to-end conversation flows
+│
+├── scratch/                       # Automated Test Suites (Phases 2 - 6)
+│   ├── test_phase2.py             # Intent Classifier & State schema tests (11/11 pass)
+│   ├── test_phase3.py             # RAG & Ranking Integration tests (5/5 pass)
+│   ├── test_phase4.py             # Agent Tools & Explainability tests (5/5 pass)
+│   ├── test_phase5.py             # LangGraph Workflow & Memory tests (8/8 pass)
+│   ├── test_phase6.py             # Multi-Round Screening tests (8/8 pass)
+│   └── test_all_phases.py         # Master test runner (37/37 pass)
+│
+├── data/                          # Dataset
+│   ├── job_descriptions/          # Sample job description specs
+│   └── selected_resumes/          # 50 PDF resumes across technical categories
+│
+└── chroma_db/                     # Persistent ChromaDB vector database
+```
+
+---
+
+## ⚙️ Setup & Installation
+
+### 1. Prerequisites
+
+* Python 3.10+
+* Git
+
+### 2. Clone Repository & Create Virtual Environment
 
 ```bash
-python -m venv .venv
+git clone https://github.com/Siddhant20104111/resume-rag-job-matcher-agent.git
+cd resume-rag-job-matcher-agent
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment (Windows PowerShell)
+.\venv\Scripts\Activate.ps1
+
+# Activate virtual environment (Linux / macOS)
+source venv/bin/activate
 ```
 
-**Windows PowerShell**
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-**macOS / Linux**
+### 3. Install Dependencies
 
 ```bash
-source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Install the project dependencies:
+### 4. Configure Environment Variables
 
-```bash
-python -m pip install -r requirements.txt
-```
-
-### 2. Configure the application
-
-Copy the included environment template.
-
-**Windows PowerShell**
-
-```powershell
-Copy-Item .env.example .env
-```
-
-**macOS / Linux**
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Set your API key in `.env`. The default configuration is:
+Open `.env` and insert your OpenRouter API key:
 
-```dotenv
+```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-LLM_MODEL=openrouter/free
-LLM_BASE_URL=https://openrouter.ai/api/v1
-EMBEDDING_PROVIDER=sentence-transformers
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ```
 
-### 3. Index the resumes
+---
 
-The sample dataset contains **50 PDF resumes across 10 categories** and **5 job descriptions**. To use your own resumes, place supported files under `data/selected_resumes/`; subfolders become category labels.
+## 🏃 Running the Application
+
+### 1. Index Resumes
+
+Before your first search, process the resumes in `data/selected_resumes/` and build the local ChromaDB index:
 
 ```bash
 python -m src.resume_rag
 ```
 
-This processes the resumes, writes extracted data to `outputs/processed_resumes.json`, and builds the local index in `chroma_db/`.
+> Running this command again rebuilds the resume collection from the files in that folder.
 
-> **Index behavior:** This command rebuilds the `resumes` collection by default. Run it before your first search and when you want to rebuild the index from your dataset.
->
-> **Scanned PDFs:** OCR requires the Tesseract executable in addition to the Python dependencies. The parser checks `C:\Program Files\Tesseract-OCR\tesseract.exe` on Windows, then relies on Tesseract being available on `PATH`.
-
-### 4. Launch the interface
+### 2. Launch Streamlit Web UI
 
 ```bash
-python -m streamlit run app.py
+streamlit run app.py
 ```
 
-Open **[localhost:8501](http://localhost:8501)** to begin. The interface provides chat, candidate cards, screening results, and state inspection.
+Open your browser at `http://localhost:8501`.
 
-## Architecture
+### 3. Run Automated Test Suite
 
-```mermaid
-flowchart TD
-    subgraph Ingestion[Resume ingestion]
-        A[PDF / DOCX / TXT] --> B[Text extraction and cleaning]
-        B --> C[Section-aware chunks and metadata]
-        C --> D[Local sentence embeddings]
-        D --> E[(ChromaDB)]
-    end
-
-    subgraph Assistant[Recruiter assistant]
-        F[Streamlit chat] --> G[LangGraph intent routing]
-        G --> H[Search and requirement refinement]
-        G --> I[Compare / explain / interview]
-        G --> J[Multi-round screening]
-        H --> K[Hybrid retrieval and scoring]
-        J --> K
-        E --> K
-        K --> L[Candidate evidence and rankings]
-        L --> M[Reports and recommendations]
-        I --> M
-        M --> F
-        N[OpenRouter LLM] -.-> G
-        N -.-> I
-        N -.-> J
-        O[In-memory conversation state] <--> G
-    end
-```
-
-| Layer | Implementation | Responsibility |
-| --- | --- | --- |
-| Interface | Streamlit | Chat, candidate results, screening views, and debugging. |
-| Orchestration | LangGraph + `MemorySaver` | Intent routing and conversation state keyed by `thread_id`. |
-| Language model | OpenRouter via `ChatOpenAI` | Intent classification, comparisons, explanations, and qualitative analysis. |
-| Embeddings | SentenceTransformers | Local `all-MiniLM-L6-v2` embeddings by default. |
-| Retrieval | ChromaDB + BM25 | Persistent vector search and keyword relevance. |
-| Document processing | PyMuPDF, python-docx, Tesseract | Text extraction with OCR support for scanned PDFs. |
-
-### How matching scores work
-
-The matching engine in [`src/job_matcher.py`](src/job_matcher.py) calculates a score on a **0–100 scale** using these default weights:
-
-| Signal | Weight | Calculation |
-| --- | --- | --- |
-| Semantic relevance | **50%** | Highest vector similarity across a candidate's chunks. |
-| Keywords and skills | **30%** | Equal blend of average normalized BM25 relevance and required-skill overlap. |
-| Experience alignment | **20%** | Candidate experience divided by required experience, capped at 1. |
-
-The weighted result is rounded and clamped to 0–100 before penalties. Missing more than half of at least two required skills multiplies the score by **0.6**. For roles requiring at least three years, falling more than 1.5 years short multiplies it by **0.7**. Both penalties can apply.
-
-Scores are matching heuristics, not probabilities of hiring success. The engine returns relevant excerpts and a reasoning summary alongside each match.
-
-### Multi-round screening
-
-```text
-Indexed resumes
-      |
-      v
-Round 1: Hybrid retrieval and ranking       -> Up to 10 shortlisted candidates
-      |
-      v
-Round 2: Evidence-based analysis            -> Up to 3 finalists
-      |
-      v
-Round 3: Mandatory-requirement evaluation   -> HIRE / NO-HIRE recommendations
-```
-
-The funnel limits are defined in [`src/screening_nodes.py`](src/screening_nodes.py). Actual shortlist sizes depend on the available candidates.
-
-## Usage
-
-### Try a recruiting conversation
-
-Start with a search, then use follow-up prompts in the same session.
-
-| Step | Example prompt |
-| --- | --- |
-| **Search** | “Find Python developers with 3+ years experience in FastAPI and PostgreSQL.” |
-| **Compare** | “Compare the top 3 candidates side by side.” |
-| **Explain** | “Why did the top candidate rank higher than the second candidate?” |
-| **Refine** | “Make Docker mandatory.” |
-| **Prepare** | “Generate tailored interview questions for the top candidate.” |
-| **Screen** | “Run a full multi-round screening process for this role.” |
-
-Select **New Conversation** in the sidebar to start a fresh session.
-
-### Use the Python API
-
-After configuring the environment and indexing resumes, call the same entry point used by Streamlit:
-
-```python
-from src.matching_agent import run_agent
-
-result = run_agent(
-    "Find Python developers with 3+ years experience in FastAPI and PostgreSQL.",
-    thread_id="python-developer-search",
-)
-print(result["report"])
-
-follow_up = run_agent(
-    "Compare the top 3 candidates side by side.",
-    thread_id="python-developer-search",
-)
-print(follow_up["report"])
-```
-
-Reuse the same `thread_id` within the running process to preserve context. ChromaDB persists the resume index on disk; `MemorySaver` retains conversations in memory, so they do not survive a process restart.
-
-## Project structure
-
-```text
-.
-|-- app.py                     # Streamlit recruiter interface
-|-- .env.example               # Environment configuration template
-|-- requirements.txt           # Python dependencies
-|-- src/
-|   |-- matching_agent.py      # LangGraph workflow and public run_agent API
-|   |-- agent_state.py         # State and candidate schemas
-|   |-- intent_classifier.py   # Intent detection
-|   |-- agent_nodes.py         # Search, refinement, ranking, and reporting
-|   |-- agent_tools.py         # Comparison, explanation, and interview tools
-|   |-- screening_nodes.py     # Three-round screening workflow
-|   |-- resume_rag.py          # End-to-end resume ingestion
-|   |-- document_processor.py  # Document parsing and OCR
-|   |-- text_processor.py      # Cleaning and section-aware chunking
-|   |-- metadata_extractor.py  # Candidate metadata extraction
-|   |-- embeddings.py          # Embedding generation
-|   |-- vector_store.py        # Persistent ChromaDB storage
-|   |-- job_matcher.py         # Hybrid retrieval and scoring
-|   `-- llm_config.py          # OpenRouter client configuration
-|-- data/
-|   |-- selected_resumes/      # Sample resumes organized by category
-|   `-- job_descriptions/      # Sample role specifications
-|-- docs/                      # Architecture, demo, and project checklist
-|-- tests/                     # Documented conversation scenarios
-|-- scratch/                   # Phase-based verification scripts
-|-- notebooks/                 # Notebook resources
-|-- outputs/                   # Generated ingestion artifacts
-`-- chroma_db/                 # Generated vector database
-```
-
-## Verification
-
-With dependencies installed, `.env` configured, and resumes indexed, run the phase-based verification scripts:
+To run all 37 integration tests across Phases 2 through 6:
 
 ```bash
 python scratch/test_all_phases.py
 ```
 
-The runner covers intent classification, state schemas, retrieval and ranking, recruiter tools, conversation memory, and multi-round screening. These are integration checks: they can use the local index and make LLM requests. Inspect the individual pass/fail output when reviewing results.
+---
 
-For manual walkthroughs, see the [conversation scenarios](tests/conversation_flows.md) and [demo script](docs/demo_script.md).
+## 💬 Example Conversational Queries
 
-## Practical considerations
-
-- **Resume quality affects results.** Text extraction, OCR, and metadata heuristics can miss skills or misread experience. Review the supporting excerpts when assessing a match.
-- **LLM calls use an external service.** Prompts and candidate evidence used by LLM-assisted features are sent to the configured OpenRouter endpoint. Embeddings run locally with the default configuration.
-- **Fallbacks have narrower capabilities.** Several LLM-assisted paths include rule-based fallbacks, but model access and request failures can still affect output quality or produce errors.
-- **Recommendations need human review.** Hire/no-hire outputs support recruiter evaluation; the final hiring decision remains with the hiring team.
-
-## Documentation
-
-| Resource | What you will find |
-| --- | --- |
-| [Architecture](docs/architecture.md) | System components and implementation details. |
-| [State machine](docs/state_machine.mmd) | Mermaid source for the agent workflow. |
-| [Demo walkthrough](docs/demo_script.md) | A guided demonstration of recruiter interactions. |
-| [Conversation scenarios](tests/conversation_flows.md) | End-to-end examples for manual verification. |
-| [Assignment checklist](docs/assignment_checklist.md) | Project requirements and implementation mapping. |
+1. **New Search**:
+   > `"Find Python developers with 3+ years experience in FastAPI and PostgreSQL."`
+2. **Side-by-Side Comparison**:
+   > `"Compare the top 3 candidates side by side."`
+3. **Ranking Explanation**:
+   > `"Why did the top candidate rank higher than the second candidate?"`
+4. **Requirement Refinement**:
+   > `"Actually, make Docker mandatory."`
+5. **Tailored Interview Questions**:
+   > `"Generate interview questions for the top candidate."`
+6. **Multi-Round Screening**:
+   > `"Run a full multi-round screening process on the top Python developer candidates."`
 
 ---
 
-<div align="center">
+## 🔮 Realistic System Limitations
 
-**Search with context. Compare with evidence. Screen with clarity.**
-
-[Back to top](#ai-resume-job-matcher)
-
-</div>
+1. **LLM Evidence Dependency**: OpenRouter LLM qualitative analysis relies on candidate resume text extracted during document ingestion. Incomplete resume text may result in unlisted skills being marked as unavailable.
+2. **Decision Support**: Final HIRE / NO-HIRE recommendations serve as executive decision support for recruiters and hiring managers, not autonomous hiring decisions.
+3. **OpenRouter Rate Limits**: Free tier model availability (`openrouter/free`) may occasionally experience latency or rate limits. The system automatically falls back to deterministic rule-based analysis if the API is temporarily unreachable.
